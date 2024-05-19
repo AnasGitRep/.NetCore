@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+﻿/*using AutoMapper;
 using EmployManagement.Data;
 using EmployManagement.Dto.Base;
 using EmployManagement.Dto.Master;
@@ -139,3 +139,4 @@ namespace EmployManagement.Services
         }
     }
 }
+*/

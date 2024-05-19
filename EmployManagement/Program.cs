@@ -1,13 +1,15 @@
-using EmployManagement.Data;
-using EmployManagement.Services;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using EmployManagement.Service.InterFaces;
+using EmployManagementDataBase.Data;
+using AutoMapper;
+
+
 var builder = WebApplication.CreateBuilder(args);
 
 
@@ -30,6 +32,12 @@ builder.Services.AddIdentity<IdentityUser, IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
 
+builder.Services.Configure<IdentityOptions>(opt =>
+{
+    opt.SignIn.RequireConfirmedEmail = true;
+});
+
+builder.Services.Configure<DataProtectionTokenProviderOptions>(opt => opt.TokenLifespan = TimeSpan.FromHours(10));
 
 //For Authentication
 builder.Services.AddAuthentication(options =>
@@ -50,7 +58,7 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["JWT:Secret"]))
     };
 
-}); 
+});
 
 
 // Add services to the container.
@@ -65,15 +73,15 @@ builder.Services.AddSwaggerGen(option =>
     option.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
-        Description="Plese enter a valid token",
-        Name="Authorization",
-        Type= SecuritySchemeType.Http,
-        BearerFormat="JWT",
-        Scheme="Bearer"
+        Description = "Plese enter a valid token",
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        BearerFormat = "JWT",
+        Scheme = "Bearer"
     });
     option.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
-        { 
+        {
             new OpenApiSecurityScheme{
                 Reference = new OpenApiReference
                 {
@@ -83,14 +91,19 @@ builder.Services.AddSwaggerGen(option =>
             },new string[]{}
 
         }
-    }); 
+    });
 });
 
-    
-    
 
-builder.Services.AddScoped<AuthService>();
-/*builder.Services.AddScoped<AdminService>();*/
+
+
+
+builder.Services.AddAutoMapper(typeof(Program));
+
+/*builder.Services.AddScoped<AuthService>();*/
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IUserManagement, UserManagement>();
+
 
 var app = builder.Build();
 

@@ -1,4 +1,4 @@
-﻿using EmployManagement.Dto.Master;
+﻿/*using EmployManagement.Dto.Master;
 using EmployManagement.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EmployManagement.Controllers.Master
 {
-/*    [Authorize(Roles ="Admin")]*/
+*//*    [Authorize(Roles ="Admin")]*//*
     [Route("api/[controller]")]
     [ApiController]
     public class AdminController : ControllerBase
@@ -16,11 +16,11 @@ namespace EmployManagement.Controllers.Master
         {
             _service = Service;
         }
-        /*
+        *//*
              public IEnumerable<string>GetEmployees()
              {
                  return new List<string> { "Anas", "Ajish" };
-             }*/
+             }*//*
 
 
 
@@ -62,3 +62,4 @@ namespace EmployManagement.Controllers.Master
     }
 
 }
+*/

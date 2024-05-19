@@ -1,51 +1,47 @@
-﻿/*using AutoMapper;
-using EmployManagement.Data;
-using EmployManagement.Dto.Base;
-using EmployManagement.Models.Authentication;
+﻿
+using EmployManagementDataBase.Data;
+using EmployManagementDataBase.Dto.Base;
+using EmployManagementDataBase.Models.Authentication;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using System.Net.Mail;
-using System.Net;
-using Microsoft.EntityFrameworkCore;
-using static System.Net.WebRequestMethods;
-using File = System.IO.File;
 
 
-namespace EmployManagement.Services
+namespace EmployManagement.Service.InterFaces
 {
-    public class AuthService
+    public class UserManagement : IUserManagement
     {
-
-
         private readonly UserManager<IdentityUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly SignInManager<IdentityUser> _signInManager;
         private readonly IConfiguration _configuration;
-        private readonly ApplicationDbContext _context;
+        private readonly ApplicationDbContext _applicationDbContext;
+        private readonly IEmailService _emailService;
 
-        public AuthService
+        public UserManagement
             (
                 UserManager<IdentityUser> userManager,
                 RoleManager<IdentityRole> roleManager,
                 SignInManager<IdentityUser> signInManager,
                 ApplicationDbContext DataContext,
-
-
+                IEmailService emailService,
                 IConfiguration configuration
             )
         {
             _configuration = configuration;
             _userManager = userManager;
-            _context = DataContext;
-            _signInManager = signInManager;
+           _signInManager = signInManager;
+            _applicationDbContext = DataContext;
             _roleManager = roleManager;
+            _emailService = emailService;
+
         }
 
-
-        public async Task<ResponseModel<RegisterModel>> Register(RegisterModel model)
+        public async Task<ResponseModel<RegisterModel>> CreateUserWithTokenAsync(RegisterModel model)
         {
             var response = new ResponseModel<RegisterModel>();
 
@@ -76,9 +72,7 @@ namespace EmployManagement.Services
                         if (result.Succeeded)
                         {
                             await _userManager.AddToRoleAsync(user, model.Role);
-
-                            string emailBody = File.ReadAllText("E:\\Interview\\Vscode\\EmployeManagement\\EmployeManagement\\Html\\mailbody.html");
-                            await SendMail(model.Email, model.UserName, emailBody, null, false);
+                            await _emailService.SendMailAsync(model.Email, model.UserName, "Welcome mail",null);
                             response.IsOk = true;
                             response.Message = "User created successfully";
                         }
@@ -123,12 +117,9 @@ namespace EmployManagement.Services
                         otp.OTP = AuthToken.ToString();
                         otp.ExpireTime = DateTime.Now;
                         otp.UserId = user.Id;
-
-                        await _context.MobilOtp.AddAsync(otp);
-                        await _context.SaveChangesAsync();
-
-                        string emailBody = File.ReadAllText("E:\\Interview\\Vscode\\EmployeManagement\\EmployeManagement\\Html\\OTP.html");
-                        await SendMail(user.Email, model.UserName, emailBody, AuthToken, false);
+                        await _applicationDbContext.MobilOtp.AddAsync(otp);
+                        await _applicationDbContext.SaveChangesAsync();
+                        await _emailService.SendMailAsync(user.Email, model.UserName,AuthToken, null);
                         response.Message = "Authentication Otp is Send to your mail";
                         return response;
                     }
@@ -161,8 +152,7 @@ namespace EmployManagement.Services
                 try
                 {
                     var user = await _userManager.FindByNameAsync(UserName);
-                    var otp = await _context.MobilOtp.Where(x => x.UserId == user.Id && x.OTP == Authtoken).FirstOrDefaultAsync();
-                    *//*                    var SignIn = await _signInManager.TwoFactorSignInAsync("Email", Authtoken, false, false);*//*
+                    var otp = await _applicationDbContext.MobilOtp.Where(x => x.UserId == user.Id && x.OTP == Authtoken).FirstOrDefaultAsync();
                     bool isExpired = IsOTPExpired(otp.ExpireTime);
                     if (otp != null && !isExpired)
                     {
@@ -201,53 +191,6 @@ namespace EmployManagement.Services
             }
         }
 
-
-        public async Task<string> ForgetPasswordAsync(string email, string resetLinkBaseUrl)
-        {
-            var user = await _userManager.FindByEmailAsync(email);
-            if (user != null)
-            {
-                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-                var resetLink = $"{resetLinkBaseUrl}?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Email)}";
-
-                await SendMail(user.Email, user.UserName, null, resetLink, true);
-                return "Reset link sent to your email";
-            }
-            return "Invalid userName";
-        }
-
-
-        public async Task<ResetPassword> GetResetPasswordModelAsync(string token, string email)
-        {
-            return await Task.FromResult(new ResetPassword { token = token, email = email });
-        }
-
-        public async Task<string> ResetPasswordAsync(ResetPassword model)
-        {
-            try
-            {
-                var user = await _userManager.FindByEmailAsync(model.email);
-                if (user != null)
-                {
-                    var resetResult = await _userManager.ResetPasswordAsync(user, model.token, model.Password);
-                    if (resetResult.Succeeded)
-                    {
-                        return "Password changed successfully";
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Log exception (if using a logging framework)
-                throw new InvalidOperationException("Unable to change password", ex);
-            }
-
-            return "Unable to change password";
-        }
-
-
-
-
         private const int OTP_EXPIRY_MINUTES = 5;
         public bool IsOTPExpired(DateTime otpCreationTime)
         {
@@ -273,65 +216,5 @@ namespace EmployManagement.Services
 
             return token;
         }
-
-
-
-        public async Task<ResponseModel<RegisterModel>> SendMail(string recipientEmail, string recipientName, string emailBody, string? token, bool isresetpass)
-        {
-
-            ResponseModel<RegisterModel> response = new ResponseModel<RegisterModel>();
-
-            if (isresetpass)
-            {
-                emailBody = File.ReadAllText("E:\\Interview\\Vscode\\EmployeManagement\\EmployeManagement\\Html\\PasswordReset.html");
-            }
-
-            emailBody = emailBody.Replace("{recipientName}", recipientName);
-            emailBody = emailBody.Replace("{OTP}", token);
-            emailBody = emailBody.Replace("{link}", token);
-            try
-            {
-                string fromMail = "ksmohammedanas50@gmail.com";
-                string fromPassword = "nvlbhhsvvfgwybez";
-
-                MailMessage mailMessage = new MailMessage();
-                mailMessage.From = new MailAddress(fromMail);
-                mailMessage.Subject = "Message";
-                mailMessage.To.Add(recipientEmail);
-                mailMessage.Body = emailBody;
-                mailMessage.IsBodyHtml = true;
-
-                var smtpClient = new SmtpClient("smtp.gmail.com")
-                {
-                    Port = 587,
-                    Credentials = new NetworkCredential(fromMail, fromPassword),
-                    EnableSsl = true
-                };
-                smtpClient.Send(mailMessage);
-                response.IsOk = true;
-                response.Message = "Sucessfully registerd";
-
-            }
-            catch (Exception ex)
-            {
-                response.IsOk = false;
-            }
-            return response;
-        }
-
-
-        public int GenerateRandomNo()
-        {
-            int _min = 1000;
-            int _max = 9999;
-            Random _rdm = new Random();
-            return _rdm.Next(_min, _max);
-        }
-
-
-
-
-
     }
 }
-*/
